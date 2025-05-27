@@ -7,7 +7,9 @@ export default function Header() {
 
   return (
     <header className="main-header">
-      <h1 className="logo">My App</h1>
+      <Link href="/" className="logo-link">
+        <h1 className="logo">My App</h1>
+      </Link>
       <nav className="main-nav">
         {loading && <p className="nav-item">Loading...</p>}
         {!loading && !session && (
