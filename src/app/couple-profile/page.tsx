@@ -1,7 +1,15 @@
+"use client";
+
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/router';
-import Header from '../components/Header'; // Assuming you have a Header component
+import { useRouter } from 'next/navigation'; // Correct import for App Router
+// Assuming Header is in src/components or a similar accessible path from src/app
+// If Header.js is still in root /components, path would be ../../components/Header
+// For this example, let's assume it might be moved to src/components/Header.tsx later or path adjusted
+// For now, using the existing path, assuming it's accessible.
+// If not, this import will need adjustment when Header is also migrated/moved.
+// import Header from '../../components/Header'; // Path if Header is in root /components
+// For now, I will remove the Header import as it's part of RootLayout.
 
 export default function CoupleProfilePage() {
   const { data: session, status } = useSession();
@@ -12,21 +20,29 @@ export default function CoupleProfilePage() {
     name2: '',
     coupleImageURL: '',
     bio: '',
-    interests: '', // Will be a comma-separated string in the form
+    interests: '', // Comma-separated string in the form
     location: '',
   });
   const [profileExists, setProfileExists] = useState(false);
-  const [isLoading, setIsLoading] = useState(true); // For page-level loading state
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false); // For form submission
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
-  // Effect to fetch profile data when component mounts or session changes
   useEffect(() => {
-    if (status === 'authenticated' && session?.user?.id) {
-      setIsLoading(true);
+    if (status === 'loading') {
+      setIsLoading(true); // Keep loading true while session is loading
+      return;
+    }
+    if (status === 'unauthenticated') {
+      router.push('/login');
+      return;
+    }
+    if (status === 'authenticated' && session?.user) {
+      setIsLoading(true); // Start loading profile data
       setError('');
       setMessage('');
-      fetch('/api/couple-profile')
+      fetch('/api/couple-profile') // This will hit src/app/api/couple-profile/route.ts
         .then(async (res) => {
           if (res.ok) {
             const data = await res.json();
@@ -41,7 +57,6 @@ export default function CoupleProfilePage() {
             setProfileExists(true);
           } else if (res.status === 404) {
             setProfileExists(false);
-            // Reset form if no profile exists for a new creation
             setFormData({ name1: '', name2: '', coupleImageURL: '', bio: '', interests: '', location: '' });
           } else {
             const errorData = await res.json();
@@ -53,24 +68,20 @@ export default function CoupleProfilePage() {
           setError('An unexpected error occurred while fetching profile data.');
         })
         .finally(() => setIsLoading(false));
-    } else if (status === 'unauthenticated') {
-      router.push('/login');
     }
-    // For status 'loading', we'll show a global loading message
   }, [session, status, router]);
 
-  const handleChange = (e) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setMessage('');
     setError('');
-    setIsLoading(true); // For submission loading
+    setIsSubmitting(true);
 
-    // Prepare data for API (convert interests string to array)
     const interestsArray = formData.interests.split(',').map(interest => interest.trim()).filter(interest => interest);
     const submissionData = {
       ...formData,
@@ -90,7 +101,7 @@ export default function CoupleProfilePage() {
 
       if (res.ok) {
         setMessage(profileExists ? 'Profile updated successfully!' : 'Profile created successfully!');
-        setFormData({ // Update form with potentially new/formatted data from server
+        setFormData({
             name1: data.name1 || '',
             name2: data.name2 || '',
             coupleImageURL: data.coupleImageURL || '',
@@ -98,7 +109,7 @@ export default function CoupleProfilePage() {
             interests: Array.isArray(data.interests) ? data.interests.join(', ') : '',
             location: data.location || '',
         });
-        setProfileExists(true); // Profile now exists
+        setProfileExists(true);
       } else {
         setError(data.message || `Failed to ${profileExists ? 'update' : 'create'} profile.`);
       }
@@ -106,98 +117,95 @@ export default function CoupleProfilePage() {
       console.error(`Error ${profileExists ? 'updating' : 'creating'} profile:`, err);
       setError(`An unexpected error occurred while ${profileExists ? 'updating' : 'creating'} the profile.`);
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
 
-  if (status === 'loading' || (isLoading && status === 'authenticated')) {
+  if (isLoading || status === 'loading') {
     return (
-      <>
-        <Header />
-        <main style={{ padding: '1rem' }}><p>Loading page data...</p></main>
-      </>
+      <main className="container homepage-main"> {/* Consistent loading style */}
+        <div className="loading-container">
+          <p>Loading page data...</p>
+        </div>
+      </main>
     );
   }
 
   if (status === 'unauthenticated') {
     // This should be handled by the useEffect redirect, but as a fallback:
     return (
-      <>
-        <Header />
-        <main style={{ padding: '1rem' }}><p>Redirecting to login...</p></main>
-      </>
+      <main className="container homepage-main">
+        <div className="loading-container">
+          <p>Redirecting to login...</p>
+        </div>
+      </main>
     );
   }
 
-  // Only render form if authenticated
+  // Only render form if authenticated and not initial loading
   if (status === 'authenticated') {
     return (
-      <>
-        <Header />
-        <main className="container" style={{ maxWidth: '600px', margin: 'auto' }}> {/* Used .container and kept specific maxWidth */}
-          <h2>{profileExists ? 'Edit Your Couple Profile' : 'Create Your Couple Profile'}</h2>
+      <main className="container" style={{ maxWidth: '600px', margin: '2rem auto' }}>
+        <div style={{ padding: '2rem', border: '1px solid #eee', borderRadius: '8px', backgroundColor: '#fff' }}>
+          <h1 style={{ textAlign: 'center' }}> {/* Removed marginBottom */}
+            {profileExists ? 'Edit Your Couple Profile' : 'Create Your Couple Profile'}
+          </h1>
 
           <form onSubmit={handleSubmit}>
-            <div style={{ marginBottom: '1rem' }}> {/* Added margin for spacing */}
-              <label htmlFor="name1">Your Name:</label>
+            <div style={{ marginBottom: '1rem' }}>
+              <label htmlFor="name1" style={{ display: 'block', marginBottom: '0.5rem' }}>Your Name:</label>
               <input type="text" id="name1" name="name1" value={formData.name1} onChange={handleChange} required />
             </div>
             <div style={{ marginBottom: '1rem' }}>
-              <label htmlFor="name2">Partner's Name:</label>
+              <label htmlFor="name2" style={{ display: 'block', marginBottom: '0.5rem' }}>Partner's Name:</label>
               <input type="text" id="name2" name="name2" value={formData.name2} onChange={handleChange} required />
             </div>
             <div style={{ marginBottom: '1rem' }}>
-              <label htmlFor="coupleImageURL">Couple Image URL:</label>
+              <label htmlFor="coupleImageURL" style={{ display: 'block', marginBottom: '0.5rem' }}>Couple Image URL:</label>
               <input type="url" id="coupleImageURL" name="coupleImageURL" value={formData.coupleImageURL} onChange={handleChange} placeholder="https://example.com/image.jpg" />
             </div>
             <div style={{ marginBottom: '1rem' }}>
-              <label htmlFor="bio">Our Bio:</label>
-              <textarea id="bio" name="bio" value={formData.bio} onChange={handleChange} rows="4"></textarea>
+              <label htmlFor="bio" style={{ display: 'block', marginBottom: '0.5rem' }}>Our Bio:</label>
+              <textarea id="bio" name="bio" value={formData.bio} onChange={handleChange} rows={4}></textarea>
             </div>
             <div style={{ marginBottom: '1rem' }}>
-              <label htmlFor="interests">Interests (comma-separated):</label>
+              <label htmlFor="interests" style={{ display: 'block', marginBottom: '0.5rem' }}>Interests (comma-separated):</label>
               <input type="text" id="interests" name="interests" value={formData.interests} onChange={handleChange} placeholder="e.g., hiking, movies, cooking" />
             </div>
-            <div style={{ marginBottom: '1rem' }}>
-              <label htmlFor="location">Location:</label>
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label htmlFor="location" style={{ display: 'block', marginBottom: '0.5rem' }}>Location:</label>
               <input type="text" id="location" name="location" value={formData.location} onChange={handleChange} placeholder="e.g., City, Country" />
             </div>
-            <button type="submit" disabled={isLoading} className="btn-block-mobile">
-              {isLoading ? 'Saving...' : (profileExists ? 'Update Profile' : 'Create Profile')}
+            <button type="submit" disabled={isSubmitting} className="btn-block-mobile" style={{ backgroundColor: '#0070f3', color: 'white' }}>
+              {isSubmitting ? 'Saving...' : (profileExists ? 'Update Profile' : 'Create Profile')}
             </button>
           </form>
 
-          {message && <p style={{ color: 'green', marginTop: '1rem' }}>{message}</p>}
-          {error && <p style={{ color: 'red', marginTop: '1rem' }}>{error}</p>}
+          {message && <p style={{ color: 'green', marginTop: '1rem', textAlign: 'center' }}>{message}</p>}
+          {error && <p style={{ color: 'red', marginTop: '1rem', textAlign: 'center' }}>{error}</p>}
 
-          <hr style={{ margin: '2rem 0' }} />
-
-          <h3>Current Profile Information:</h3>
-          {profileExists && !isLoading ? (
-            <div>
+          {/* Display current profile info - this part can be enhanced or kept simple */}
+          {profileExists && !isSubmitting && (
+            <div style={{ marginTop: '2rem', borderTop: '1px solid #eee', paddingTop: '1rem' }}>
+              <h3>Current Profile:</h3>
               <p><strong>Name 1:</strong> {formData.name1}</p>
               <p><strong>Name 2:</strong> {formData.name2}</p>
-              <p><strong>Image URL:</strong> {formData.coupleImageURL || 'Not set'}</p>
-              {formData.coupleImageURL && <img src={formData.coupleImageURL} alt="Couple" style={{maxWidth: '200px', maxHeight: '200px', objectFit: 'cover'}}/>}
+              {formData.coupleImageURL && <img src={formData.coupleImageURL} alt="Couple" style={{maxWidth: '200px', maxHeight: '200px', objectFit: 'cover', borderRadius: '4px', margin: '0.5rem 0'}}/>}
               <p><strong>Bio:</strong> {formData.bio || 'Not set'}</p>
               <p><strong>Location:</strong> {formData.location || 'Not set'}</p>
-              <p><strong>Interests:</strong></p>
-              {formData.interests ? (
-                <ul>
-                  {formData.interests.split(',').map(interest => interest.trim()).filter(i => i).map((interest, index) => (
-                    <li key={index}>{interest}</li>
-                  ))}
-                </ul>
-              ) : <p>No interests listed.</p>}
+              <p><strong>Interests:</strong> {formData.interests || 'Not set'}</p>
             </div>
-          ) : (
-            <p>{isLoading ? 'Loading profile...' : 'No profile created yet. Fill out the form above!'}</p>
           )}
-        </main>
-      </>
+        </div>
+      </main>
     );
   }
 
-  // Fallback for any other state, though ideally handled above.
-  return <p>Something went wrong.</p>;
+  return (
+    <main className="container homepage-main">
+      <div className="loading-container">
+         <p>Please login to manage your profile.</p> {/* Fallback if no other condition met */}
+      </div>
+    </main>
+  );
 }

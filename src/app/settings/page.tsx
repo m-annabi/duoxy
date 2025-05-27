@@ -1,8 +1,10 @@
-import { useState } from 'react';
+"use client";
+
+import { useState, useEffect } from 'react';
 import { useSession, signOut } from 'next-auth/react';
-import { useRouter } from 'next/router';
-import Header from '../components/Header'; // Assuming you have a Header component
-import Head from 'next/head';
+import { useRouter } from 'next/navigation'; // Correct import for App Router
+// Header is part of RootLayout, so no need to import here.
+// import Head from 'next/head'; // Head can be used if needed for page-specific title, but usually handled in layout or page metadata export
 
 export default function SettingsPage() {
   const { data: session, status } = useSession();
@@ -21,30 +23,15 @@ export default function SettingsPage() {
   const [deleteAccountError, setDeleteAccountError] = useState('');
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
-  // Redirect if not authenticated
-  if (status === 'loading') {
-    return (
-      <>
-        <Head><title>Settings</title></Head>
-        <Header />
-        <main style={{ padding: '1rem' }}><p>Loading...</p></main>
-      </>
-    );
-  }
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/login');
+    }
+  }, [status, router]);
 
-  if (status === 'unauthenticated') {
-    router.push('/login');
-    return ( // Return minimal content during redirect
-      <>
-        <Head><title>Settings</title></Head>
-        <Header />
-        <main style={{ padding: '1rem' }}><p>Redirecting to login...</p></main>
-      </>
-    );
-  }
 
   // Handle Change Password
-  const handleChangePassword = async (e) => {
+  const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setPasswordChangeMessage('');
     setPasswordChangeError('');
@@ -60,7 +47,7 @@ export default function SettingsPage() {
 
     setIsPasswordChanging(true);
     try {
-      const res = await fetch('/api/user/change-password', {
+      const res = await fetch('/api/user/change-password', { // Points to new App Router endpoint
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ currentPassword, newPassword }),
@@ -91,54 +78,70 @@ export default function SettingsPage() {
     if (window.confirm('Are you sure you want to delete your account? This action is irreversible.')) {
       setIsDeletingAccount(true);
       try {
-        const res = await fetch('/api/user/delete-account', {
-          method: 'POST', // Or 'DELETE', API supports both
+        const res = await fetch('/api/user/delete-account', { // Points to new App Router endpoint
+          method: 'POST', 
         });
 
         const data = await res.json();
         if (res.ok) {
           setDeleteAccountMessage(data.message || 'Account deleted successfully. Redirecting...');
-          // Sign out and redirect to home page
           await signOut({ callbackUrl: '/' });
         } else {
           setDeleteAccountError(data.message || 'Failed to delete account.');
+          setIsDeletingAccount(false); // Re-enable button if error
         }
       } catch (error) {
         console.error('Delete account error:', error);
         setDeleteAccountError('An unexpected error occurred while deleting the account.');
-      } finally {
-        setIsDeletingAccount(false); // Only if not redirecting immediately
+        setIsDeletingAccount(false); // Re-enable button if error
       }
+      // No finally setIsDeletingAccount(false) here, because successful deletion leads to navigation
     }
   };
 
+  if (status === 'loading') {
+    return (
+      <main className="container homepage-main">
+        <div className="loading-container">
+          <p>Loading...</p>
+        </div>
+      </main>
+    );
+  }
+  
+  if (status === 'unauthenticated') {
+     // Should be handled by useEffect redirect, but good to have a fallback UI
+    return (
+      <main className="container homepage-main">
+        <div className="loading-container">
+          <p>Redirecting to login...</p>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <>
-      <Head>
-        <title>Account Settings</title>
-      </Head>
-      <Header />
-      <main className="container" style={{ maxWidth: '600px', margin: 'auto' }}> {/* Used .container */}
-        <h1>Account Settings</h1>
+      {/* <Head> <title>Account Settings</title> </Head> */} {/* Title can be set via exported metadata if needed */}
+      <main className="container" style={{ maxWidth: '600px', margin: '2rem auto' }}>
+          <h1 style={{ textAlign: 'center' }}>Account Settings</h1> {/* Removed marginBottom */}
 
         {/* Change Password Section */}
-        <section style={{ marginBottom: '2rem', padding: '1rem', border: '1px solid #eee', borderRadius: '5px' }}>
-          <h2>Change Password</h2>
+        <section style={{ marginBottom: '2rem', padding: '2rem', border: '1px solid #eee', borderRadius: '8px', backgroundColor: '#fff' }}>
+          <h2 style={{ marginTop: 0, marginBottom: '1.5rem', textAlign: 'center' }}>Change Password</h2>
           <form onSubmit={handleChangePassword}>
-            <div style={{ marginBottom: '1rem' }}> {/* Increased margin for better spacing */}
-              <label htmlFor="currentPassword">Current Password:</label>
+            <div style={{ marginBottom: '1rem' }}>
+              <label htmlFor="currentPassword" style={{ display: 'block', marginBottom: '0.5rem' }}>Current Password:</label>
               <input
                 type="password"
                 id="currentPassword"
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 required
-                // style attribute removed, global styles apply
               />
             </div>
             <div style={{ marginBottom: '1rem' }}>
-              <label htmlFor="newPassword">New Password:</label>
+              <label htmlFor="newPassword" style={{ display: 'block', marginBottom: '0.5rem' }}>New Password:</label>
               <input
                 type="password"
                 id="newPassword"
@@ -146,11 +149,10 @@ export default function SettingsPage() {
                 onChange={(e) => setNewPassword(e.target.value)}
                 required
                 minLength={6}
-                // style attribute removed, global styles apply
               />
             </div>
-            <div style={{ marginBottom: '1rem' }}>
-              <label htmlFor="confirmNewPassword">Confirm New Password:</label>
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label htmlFor="confirmNewPassword" style={{ display: 'block', marginBottom: '0.5rem' }}>Confirm New Password:</label>
               <input
                 type="password"
                 id="confirmNewPassword"
@@ -158,33 +160,32 @@ export default function SettingsPage() {
                 onChange={(e) => setConfirmNewPassword(e.target.value)}
                 required
                 minLength={6}
-                // style attribute removed, global styles apply
               />
             </div>
-            <button type="submit" disabled={isPasswordChanging} className="btn-block-mobile" style={{ padding: '10px 15px' }}>
+            <button type="submit" disabled={isPasswordChanging} className="btn-block-mobile" style={{ backgroundColor: '#0070f3', color: 'white' }}>
               {isPasswordChanging ? 'Changing...' : 'Change Password'}
             </button>
-            {passwordChangeMessage && <p style={{ color: 'green', marginTop: '0.5rem' }}>{passwordChangeMessage}</p>}
-            {passwordChangeError && <p style={{ color: 'red', marginTop: '0.5rem' }}>{passwordChangeError}</p>}
+            {passwordChangeMessage && <p style={{ color: 'green', marginTop: '1rem', textAlign: 'center' }}>{passwordChangeMessage}</p>}
+            {passwordChangeError && <p style={{ color: 'red', marginTop: '1rem', textAlign: 'center' }}>{passwordChangeError}</p>}
           </form>
         </section>
 
         {/* Delete Account Section */}
-        <section style={{ padding: '1rem', border: '1px solid #eee', borderRadius: '5px', background: '#fff0f0' }}>
-          <h2>Delete Account</h2>
-          <p>
+        <section style={{ padding: '2rem', border: '1px solid #eee', borderRadius: '8px', backgroundColor: '#fff0f0' }}>
+          <h2 style={{ marginTop: 0, marginBottom: '1.5rem', textAlign: 'center' }}>Delete Account</h2>
+          <p style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
             This action is irreversible. All your data, including your couple profile, will be permanently deleted.
           </p>
           <button
             onClick={handleDeleteAccount}
             disabled={isDeletingAccount}
-            style={{ backgroundColor: 'red', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }} // Removed padding, base button style has it
-            className="btn-block-mobile" // Added class for responsive width
+            className="btn-block-mobile"
+            style={{ backgroundColor: 'red', color: 'white' }}
           >
             {isDeletingAccount ? 'Deleting...' : 'Delete My Account'}
           </button>
-          {deleteAccountMessage && <p style={{ color: 'green', marginTop: '0.5rem' }}>{deleteAccountMessage}</p>}
-          {deleteAccountError && <p style={{ color: 'red', marginTop: '0.5rem' }}>{deleteAccountError}</p>}
+          {deleteAccountMessage && <p style={{ color: 'green', marginTop: '1rem', textAlign: 'center' }}>{deleteAccountMessage}</p>}
+          {deleteAccountError && <p style={{ color: 'red', marginTop: '1rem', textAlign: 'center' }}>{deleteAccountError}</p>}
         </section>
       </main>
     </>

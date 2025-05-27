@@ -241,8 +241,25 @@ input[type="submit"]:hover {
 
 .action-buttons .btn {
   margin: 0.5rem;
-  padding: 12px 25px; /* Larger padding for homepage CTAs */
-  font-size: 1.1rem;
+  padding: 12px 25px !important; /* Ensure homepage CTAs are larger, !important to override generic .btn if necessary */
+  font-size: 1.1rem !important; /* Ensure homepage CTAs are larger */
+}
+
+/* Generic .btn class for <a> tags or elements to look like buttons */
+.btn {
+  display: inline-block;
+  padding: 10px 15px; /* Default padding from button styles */
+  font-size: 1rem; /* Default font-size from button styles */
+  border-radius: 4px; /* Default border-radius from button styles */
+  cursor: pointer;
+  text-align: center;
+  text-decoration: none;
+  transition: opacity 0.2s ease-in-out;
+}
+
+.btn:hover {
+  opacity: 0.9;
+  text-decoration: none;
 }
 
 .btn-primary {
