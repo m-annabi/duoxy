@@ -1,19 +1,15 @@
-import prisma from '../../../lib/prisma'; // Adjust path as needed
-import { getSession } from 'next-auth/react';
+import { NextResponse } from 'next/server';
+import prisma from '../../../../../lib/prisma'; // Adjusted path
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '../../auth/[...nextauth]/route'; // Import authOptions
 
-export default async function handler(req, res) {
-  if (req.method !== 'GET') {
-    res.setHeader('Allow', ['GET']);
-    return res.status(405).json({ message: `Method ${req.method} Not Allowed` });
+export async function GET(request: Request) {
+  const session = await getServerSession(authOptions);
+
+  if (!session || !session.user || !(session.user as any).id) {
+    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
   }
-
-  const session = await getSession({ req });
-
-  if (!session || !session.user || !session.user.id) {
-    return res.status(401).json({ message: 'Unauthorized' });
-  }
-
-  const userId = session.user.id;
+  const userId = (session.user as any).id;
 
   try {
     // Fetch the logged-in user's CoupleProfile ID
@@ -24,9 +20,8 @@ export default async function handler(req, res) {
 
     if (!ownCoupleProfile) {
       // User does not have a couple profile, so they cannot have matches.
-      return res.status(200).json([]); // Return empty list, or 404 if preferred
+      return NextResponse.json([], { status: 200 }); // Return empty list
     }
-
     const ownCoupleProfileId = ownCoupleProfile.id;
 
     // Fetch matches where the user's couple profile ID is either A or B
@@ -37,8 +32,6 @@ export default async function handler(req, res) {
           { coupleProfileBId: ownCoupleProfileId },
         ],
       },
-      // We don't need to include the related profiles here,
-      // as we'll fetch them in a separate step based on the extracted IDs.
     });
 
     // Extract the IDs of the other couple profiles from the matches
@@ -48,10 +41,10 @@ export default async function handler(req, res) {
           ? match.coupleProfileBId
           : match.coupleProfileAId;
       })
-      .filter((id) => id !== ownCoupleProfileId); // Ensure no self-references (shouldn't happen with proper match logic)
+      .filter((id) => id !== ownCoupleProfileId); // Ensure no self-references
 
     if (matchedProfileIds.length === 0) {
-      return res.status(200).json([]); // No matches found
+      return NextResponse.json([], { status: 200 }); // No matches found
     }
 
     // Fetch the details of these matched CoupleProfiles
@@ -59,14 +52,12 @@ export default async function handler(req, res) {
       where: {
         id: { in: matchedProfileIds },
       },
-      // Select specific fields if needed, or fetch all for now
-      // select: { id: true, name1: true, name2: true, coupleImageURL: true, bio: true, interests: true }
     });
 
-    return res.status(200).json(matchedProfiles);
+    return NextResponse.json(matchedProfiles, { status: 200 });
 
   } catch (error) {
     console.error('Error fetching connections:', error);
-    return res.status(500).json({ message: 'Internal Server Error while fetching connections.' });
+    return NextResponse.json({ message: 'Internal Server Error while fetching connections.' }, { status: 500 });
   }
 }

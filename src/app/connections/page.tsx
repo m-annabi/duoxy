@@ -1,22 +1,26 @@
+"use client";
+
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/router';
-import Head from 'next/head';
-import Header from '../components/Header'; // Assuming Header component exists
+import { useRouter } from 'next/navigation'; // Correct import for App Router
+// Header is part of RootLayout
+// import Head from 'next/head'; // Metadata can be exported if needed
 
 export default function ConnectionsPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
 
-  const [connections, setConnections] = useState([]);
+  const [connections, setConnections] = useState<any[]>([]); // Consider defining a Profile type
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (status === 'authenticated') {
+    if (status === 'unauthenticated') {
+      router.push('/login');
+    } else if (status === 'authenticated') {
       setIsLoading(true);
       setError('');
-      fetch('/api/connections')
+      fetch('/api/connections') // Hits new App Router endpoint
         .then(async (res) => {
           if (res.ok) {
             const data = await res.json();
@@ -35,21 +39,19 @@ export default function ConnectionsPage() {
         .finally(() => {
           setIsLoading(false);
         });
-    } else if (status === 'unauthenticated') {
-      router.push('/login');
     }
   }, [status, router]);
 
-  // Styles - can be moved to a CSS file
-  const styles = {
+  // Styles - can be moved to a CSS file or a style object at the top
+  const styles: { [key: string]: React.CSSProperties } = { // Added type for styles object
     container: {
       padding: '1rem',
-      maxWidth: '900px', // Wider for grid/list view
+      maxWidth: '900px',
       margin: '20px auto',
     },
     grid: {
       display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', // Responsive grid
+      gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
       gap: '20px',
     },
     card: {
@@ -60,83 +62,58 @@ export default function ConnectionsPage() {
       background: '#fff',
       display: 'flex',
       flexDirection: 'column',
+      minHeight: '350px', // Ensure a consistent card height
     },
     profileImage: {
       width: '100%',
-      height: '200px', // Fixed height for consistency
+      height: '200px',
       objectFit: 'cover',
       borderRadius: '4px',
       marginBottom: '10px',
     },
-    names: {
-      fontSize: '1.3em',
-      fontWeight: 'bold',
-      marginBottom: '8px',
-    },
-    bio: {
-      fontSize: '0.9em',
-      color: '#555',
-      marginBottom: '10px',
-      flexGrow: 1, // Allow bio to take available space
+    names: { fontSize: '1.3em', fontWeight: 'bold', marginBottom: '8px' },
+    bio: { 
+      fontSize: '0.9em', 
+      color: '#555', 
+      marginBottom: '10px', 
+      flexGrow: 1,
       overflow: 'hidden',
       textOverflow: 'ellipsis',
       display: '-webkit-box',
-      WebkitLineClamp: 3, // Limit to 3 lines
-      WebkitBoxOrient: 'vertical',
+      WebkitLineClamp: 3, // Fallback for browsers not supporting -webkit-line-clamp
+      maxHeight: '3.6em', // Fallback: approx 3 lines (0.9em * 1.33 line-height * 3)
+      lineHeight: '1.33', // Ensure consistent line height for maxHeight calculation
     },
-    interestsContainer: {
-      marginTop: 'auto', // Push interests to the bottom if card height varies
-      paddingTop: '10px',
-    },
-    interestTag: {
-      display: 'inline-block',
-      background: '#eee',
-      color: '#333',
-      padding: '4px 8px',
-      borderRadius: '12px',
-      margin: '2px',
-      fontSize: '0.8em',
-    },
-    noConnectionsText: {
-      textAlign: 'center',
-      fontSize: '1.1em',
-      color: '#777',
-      marginTop: '50px',
-    },
+    interestsContainer: { marginTop: 'auto', paddingTop: '10px' },
+    interestTag: { display: 'inline-block', background: '#eee', color: '#333', padding: '4px 8px', borderRadius: '12px', margin: '2px', fontSize: '0.8em' },
+    noConnectionsText: { textAlign: 'center', fontSize: '1.1em', color: '#777', marginTop: '50px' },
   };
+
 
   if (status === 'loading') {
     return (
-      <>
-        <Head><title>My Connections</title></Head>
-        <Header />
-        <main className="container"><p>Loading...</p></main> {/* Changed to className */}
-      </>
+      <main className="container homepage-main">
+        <div className="loading-container"><p>Loading...</p></div>
+      </main>
     );
   }
-
+  
   if (status === 'unauthenticated') {
     return (
-      <>
-        <Head><title>My Connections</title></Head>
-        <Header />
-        <main className="container"><p>Redirecting to login...</p></main> {/* Changed to className */}
-      </>
+      <main className="container homepage-main">
+        <div className="loading-container"><p>Redirecting to login...</p></div>
+      </main>
     );
   }
 
   return (
     <>
-      <Head>
-        <title>My Connections</title>
-      </Head>
-      <Header />
-      {/* Applied .container class to main, removed inline style for it */}
-      <main className="container" style={{ maxWidth: styles.container.maxWidth, margin: styles.container.margin }}>
-        <h1>My Connections</h1>
+      {/* <Head><title>My Connections</title></Head> */} {/* Metadata can be exported */}
+      <main style={styles.container}> {/* Using local styles for container here */}
+        <h1 style={{ textAlign: 'center' }}>My Connections</h1> {/* Removed marginBottom */}
 
-        {isLoading && <p>Loading connections...</p>}
-        {error && <p style={{ color: 'red' }}>Error: {error}</p>}
+        {isLoading && <p style={{textAlign: 'center'}}>Loading connections...</p>}
+        {error && <p style={{ color: 'red', textAlign: 'center' }}>Error: {error}</p>}
 
         {!isLoading && !error && connections.length === 0 && (
           <p style={styles.noConnectionsText}>You haven't made any connections yet.</p>
@@ -149,8 +126,8 @@ export default function ConnectionsPage() {
                 {profile.coupleImageURL ? (
                   <img src={profile.coupleImageURL} alt={`${profile.name1} & ${profile.name2}`} style={styles.profileImage} />
                 ) : (
-                  <div style={{...styles.profileImage, background: '#eee', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#aaa'}}>
-                    No Image
+                  <div style={{...styles.profileImage, background: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#aaa', fontSize: '1.2rem'}}>
+                    No Image Available
                   </div>
                 )}
                 <h2 style={styles.names}>{profile.name1} &amp; {profile.name2}</h2>
@@ -158,9 +135,9 @@ export default function ConnectionsPage() {
                 
                 {profile.interests && profile.interests.length > 0 && (
                   <div style={styles.interestsContainer}>
-                    <strong>Interests:</strong>
+                    <strong style={{display: 'block', marginBottom: '5px'}}>Interests:</strong>
                     <div>
-                      {profile.interests.slice(0, 5).map((interest, index) => ( // Show up to 5 interests
+                      {profile.interests.slice(0, 5).map((interest: string, index: number) => (
                         <span key={index} style={styles.interestTag}>{interest}</span>
                       ))}
                       {profile.interests.length > 5 && <span style={styles.interestTag}>...</span>}
